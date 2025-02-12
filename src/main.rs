@@ -23,8 +23,8 @@ async fn handle_client(mut socket: TcpStream) -> Result<(), Box<dyn Error>> {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    let listener = TcpListener::bind("0.0.0.0:8080").await?;
-    println!("Server listening on 0.0.0.0:8080");
+    let listener = TcpListener::bind("127.0.0.1:8080").await?;
+    println!("Server listening on 127.0.0.1:8080");
 
     loop {
         let (socket, _) = listener.accept().await?;
