@@ -1,9 +1,11 @@
+use std::borrow::Cow;
 use std::error::Error;
 use std::time::Duration;
 use local_ip_address::local_ip;
 use tokio::net::{TcpListener, UdpSocket};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::time::sleep;
+use rdev::{simulate, Button, EventType, SimulateError};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -58,10 +60,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
                         break;
                     }
                     Ok(n) => {
-                        println!("Received: {}", String::from_utf8_lossy(&buf[..n]));
-                        socket.write_all(b"Message received\n")
-                            .await
-                            .unwrap();
+                        let message = String::from_utf8_lossy(&buf[..n]);
+                        simulate_key_event(message);
                     }
                     Err(e) => {
                         println!("Error: {}", e);
@@ -71,4 +71,41 @@ async fn main() -> Result<(), Box<dyn Error>> {
             }
         });
     }
+}
+
+fn simulate_key_event(message: Cow<str>){
+    if let Some((event_type, x, y)) = parse_message(&message) {
+        match event_type {
+            "MOVE" => {
+                if let Err(SimulateError) = simulate(&EventType::MouseMove {x, y}) {
+                    eprintln!("Failed to simulate mouse move");
+                }
+            }
+            "LEFT_DOWN" => {
+                if let Err(SimulateError) = simulate(&EventType::ButtonPress(Button::Left)) {
+                    eprintln!("Failed to simulate left mouse down");
+                }
+            }
+            "LEFT_UP" => {
+                if let Err(SimulateError) = simulate(&EventType::ButtonRelease(Button::Left)) {
+                    eprintln!("Failed to simulate left mouse up");
+                }
+            }
+            _ => {
+                eprintln!("Invalid event type");
+            }
+        }
+    } else {
+        eprintln!("Invalid message");
+    }
+}
+
+fn parse_message(message: &str) -> Option<(&str, f64, f64)> {
+    let parts: Vec<&str> = message.split_whitespace().collect();
+    if parts.len() == 3 && parts[0] == "MOVE" {
+        if let (Ok(x), Ok(y)) = (parts[1].parse::<f64>(), parts[2].parse::<f64>()) {
+            return Some((parts[0], x, y));
+        }
+    }
+    None
 }
