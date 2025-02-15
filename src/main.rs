@@ -4,8 +4,8 @@ use std::error::Error;
 use std::time::Duration;
 use local_ip_address::local_ip;
 use tokio::net::{TcpListener, UdpSocket};
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::time::sleep;
+use tokio::io::{AsyncReadExt};
+use tokio::time::{sleep, timeout};
 use input_receiver::{simulate_mouse_event};
 
 #[tokio::main]
@@ -54,19 +54,21 @@ async fn main() -> Result<(), Box<dyn Error>> {
         tokio::spawn(async move {
             let mut buf = [0; 1024];
 
+            const READ_TIMEOUT: Duration = Duration::from_secs(30);
+
             loop {
-                match socket.read(&mut buf).await {
-                    Ok(0) => {
-                        println!("Connection closed");
-                        break;
-                    }
-                    Ok(n) => {
+                match timeout(READ_TIMEOUT, socket.read(&mut buf)).await {
+                    Ok(Ok(n)) => {
                         let message = String::from_utf8_lossy(&buf[..n]);
                         simulate_mouse_event(message);
                     }
-                    Err(e) => {
+                    Ok(Err(e)) => {
                         println!("Error: {}", e);
-                        return;
+                        break;
+                    }
+                    Err(_) => {
+                        println!("Read timed out");
+                        break;
                     }
                 }
             }
